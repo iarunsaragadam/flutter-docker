@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Flutter version from the tag
         run: echo "FLUTTER_VERSION=$(echo ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
@@ -19,14 +19,18 @@ jobs:
       - name: Build Docker image
         run: |
           docker build --build-arg FLUTTER_VERSION=$FLUTTER_VERSION -t flutter-web-builder:$FLUTTER_VERSION .
+          docker images | grep flutter-web-builder  # Verify the image exists
 
       - name: Save Docker image to file
         run: |
-          docker save flutter-web-builder:$FLUTTER_VERSION | gzip > flutter-web-builder-$FLUTTER_VERSION.tar.gz
+          docker save flutter-web-builder:$FLUTTER_VERSION -o flutter-web-builder-$FLUTTER_VERSION.tar
+          gzip flutter-web-builder-$FLUTTER_VERSION.tar
+          ls -lh flutter-web-builder-$FLUTTER_VERSION.tar.gz  # Verify the file exists and has a reasonable size
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
         with:
           files: flutter-web-builder-$FLUTTER_VERSION.tar.gz
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
