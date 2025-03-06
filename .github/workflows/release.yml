@@ -1,0 +1,54 @@
+name: Publish Docker Image to GHCR
+
+on:
+  push: # Runs on every push to any branch or tag
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter version from the tag or commit hash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "FLUTTER_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "FLUTTER_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/iarunsaragadam/flutter-web-builder:${{ env.FLUTTER_VERSION }}
+          build-args: |
+            FLUTTER_VERSION=${{ env.FLUTTER_VERSION }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/iarunsaragadam/flutter-docker
+            org.opencontainers.image.description=Flutter Web Builder Docker image
+            org.opencontainers.image.licenses=MIT
+
+      - name: Make package public via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          # Set the package visibility to public
+          curl -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/user/packages/container/flutter-web-builder/visibility \
+            -d '{"visibility":"public"}'
