@@ -1,25 +1,46 @@
-name: Publish Docker Image to GHCR
+name: Publish Multi-Arch Docker Image to GHCR
 
 on:
   push:
     tags:
       - "v*.*.*" # Run only when tags matching version format are pushed
+      - "*.*.*" # Run also when tags without the 'v' prefix are pushed
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: "Flutter version to build (e.g., 3.29.0)"
+        required: true
+        default: "3.29.0"
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Flutter version from the tag or commit hash
+      - name: Set up Flutter version from the tag or input
         run: |
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo "FLUTTER_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            # Extract version from tag
+            FLUTTER_VERSION=${GITHUB_REF#refs/tags/}
+            # Store the version without the 'v' prefix for Flutter checkout
+            FLUTTER_VERSION_NO_V=${FLUTTER_VERSION#v}
           else
-            echo "FLUTTER_VERSION=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}" >> $GITHUB_ENV
+            # Use the input parameter (now without 'v' prefix in the input)
+            FLUTTER_VERSION="v${{ github.event.inputs.flutter_version }}"
+            FLUTTER_VERSION_NO_V="${{ github.event.inputs.flutter_version }}"
           fi
+
+          echo "FLUTTER_VERSION=$FLUTTER_VERSION" >> $GITHUB_ENV
+          echo "FLUTTER_VERSION_NO_V=$FLUTTER_VERSION_NO_V" >> $GITHUB_ENV
+
+      - name: Set up QEMU for multi-platform builds
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -31,26 +52,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GH_TOKEN }}
 
-      - name: Build and push
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/flutter-web-builder
+          tags: |
+            type=raw,value=${{ env.FLUTTER_VERSION }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push multi-arch image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/iarunsaragadam/flutter-web-builder:${{ env.FLUTTER_VERSION }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            FLUTTER_VERSION=${{ env.FLUTTER_VERSION }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/iarunsaragadam/flutter-docker
-            org.opencontainers.image.description=Flutter Web Builder Docker image
-            org.opencontainers.image.licenses=MIT
-
-      - name: Make package public via GitHub API
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          # Set the package visibility to public
-          curl -X PATCH \
-            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/user/packages/container/flutter-web-builder/visibility \
-            -d '{"visibility":"public"}'
+            FLUTTER_VERSION=${{ env.FLUTTER_VERSION_NO_V }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
