@@ -1,0 +1,32 @@
+name: Release Docker Image for Flutter Web App
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Flutter version from the tag
+        run: echo "FLUTTER_VERSION=$(echo ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          docker build --build-arg FLUTTER_VERSION=$FLUTTER_VERSION -t flutter-web-builder:$FLUTTER_VERSION .
+
+      - name: Save Docker image to file
+        run: |
+          docker save flutter-web-builder:$FLUTTER_VERSION | gzip > flutter-web-builder-$FLUTTER_VERSION.tar.gz
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: flutter-web-builder-$FLUTTER_VERSION.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
