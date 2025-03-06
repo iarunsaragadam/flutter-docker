@@ -1,7 +1,9 @@
 name: Publish Docker Image to GHCR
 
 on:
-  push: # Runs on every push to any branch or tag
+  push:
+    tags:
+      - "v*.*.*" # Run only when tags matching version format are pushed
 
 jobs:
   publish:
