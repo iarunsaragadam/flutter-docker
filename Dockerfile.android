@@ -6,6 +6,12 @@ ENV FLUTTER_VERSION=$FLUTTER_VERSION
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH="/flutter/bin:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools:${PATH}"
 
+LABEL org.opencontainers.image.source="https://github.com/iarunsaragadam/flutter-docker"
+LABEL org.opencontainers.image.description="Flutter Android Builder - Pre-configured Docker image for building Flutter Android applications. Includes Flutter SDK, Java 17, Android SDK, build tools, and NDK. Default command runs 'flutter clean && flutter pub get && flutter build apk --release'. Built for both amd64 and arm64 architectures."
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.documentation="https://github.com/iarunsaragadam/flutter-docker"
+
+
 # Install necessary dependencies
 RUN apt-get update && apt-get install -y \
     curl \

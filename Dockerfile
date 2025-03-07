@@ -5,6 +5,11 @@ ARG FLUTTER_VERSION=3.29.0
 ENV FLUTTER_VERSION=$FLUTTER_VERSION
 ENV PATH="/flutter/bin:${PATH}"
 
+LABEL org.opencontainers.image.source="https://github.com/iarunsaragadam/flutter-docker"
+LABEL org.opencontainers.image.description="Flutter Web Builder - Pre-configured Docker image for building Flutter web applications. Includes Flutter SDK, web dependencies, and build tools. Default command runs 'flutter clean && flutter pub get && flutter build web --release'. Built for both amd64 and arm64 architectures."
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.documentation="https://github.com/iarunsaragadam/flutter-docker"
+
 # Install necessary dependencies
 RUN apt-get update && apt-get install -y \
     curl \

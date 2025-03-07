@@ -1,58 +1,239 @@
-# Flutter Web Builder
+# Flutter Docker Builders
 
-A Docker image for building Flutter web applications with specific Flutter versions.
+This repository provides Docker images for building Flutter applications across multiple platforms. These pre-configured images allow developers to build Flutter projects without installing Flutter and its dependencies locally.
 
-## Overview
+[![Publish Flutter Docker Images](https://github.com/iarunsaragadam/flutter-docker/actions/workflows/flutter-docker-build.yml/badge.svg)](https://github.com/iarunsaragadam/flutter-docker/actions/workflows/flutter-docker-build.yml)
 
-This repository contains a Dockerfile and GitHub Actions workflow to build and publish Docker images with specific Flutter versions. These images can be used to build Flutter web applications in CI/CD pipelines or development environments with a consistent Flutter SDK.
+## Available Images
 
-## Usage
+| Image | Purpose | GitHub Package |
+|-------|---------|----------------|
+| `flutter-web-builder`     | Build Flutter web applications     | [View on GHCR](https://github.com/users/iarunsaragadam/packages/container/package/flutter-web-builder)     |
+| `flutter-android-builder` | Build Flutter Android applications | [View on GHCR](https://github.com/users/iarunsaragadam/packages/container/package/flutter-android-builder) |
 
-### Pull the image
+## Using the Docker Images
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed on your machine
+- A Flutter project you want to build
+
+### Building Flutter Web Applications
+
+Pull the image:
 
 ```bash
-docker pull ghcr.io/iarunsaragadam/flutter-web-builder:v3.29.0
+docker pull ghcr.io/iarunsaragadam/flutter-web-builder:latest
+# Or specify a version
+# docker pull ghcr.io/iarunsaragadam/flutter-web-builder:v3.29.0
 ```
 
-Replace `v3.29.0` with the specific Flutter version you need.
-
-### Run the container
+Run the container to build your web app (make sure you're in your Flutter project directory):
 
 ```bash
-docker run --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:v3.29.0 bash -c "cd /app && flutter build web"
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest
 ```
 
-This mounts your current directory to `/app` in the container and runs the Flutter web build command.
+This will:
+1. Mount your current directory to `/app` in the container
+2. Run the default command which executes `flutter clean && flutter pub get && flutter build web --release`
 
-## Available Versions
+The output web build will be available in your project at:
+```
+build/web/
+```
 
-The Docker images are tagged with the corresponding Flutter version. For example:
+If you want to run a different Flutter command:
 
-- `ghcr.io/iarunsaragadam/flutter-web-builder:v3.29.0`
-- `ghcr.io/iarunsaragadam/flutter-web-builder:v3.28.0`
-- `ghcr.io/iarunsaragadam/flutter-web-builder:v3.27.0`
+```bash
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest flutter analyze
+```
 
-Check the [GitHub Container Registry](https://github.com/iarunsaragadam/flutter-docker/pkgs/container/flutter-web-builder) for all available versions.
+To serve the built web app on your host machine:
 
-## Dockerfile
+```bash
+# Using Nginx for production-like serving
+docker run -it --rm -v $(pwd)/build/web:/usr/share/nginx/html -p 8080:80 nginx:alpine
+```
 
-The Dockerfile installs the specified Flutter version and configures it for web development. It includes:
+Then open http://localhost:8080 in your browser.
 
-- Flutter SDK with web support
-- Chrome browser for testing
-- Required dependencies
+### Building Flutter Android Applications
 
-## GitHub Actions Workflow
+Pull the image:
 
-The repository includes a GitHub Actions workflow that:
+```bash
+docker pull ghcr.io/iarunsaragadam/flutter-android-builder:latest
+# Or specify a version
+# docker pull ghcr.io/iarunsaragadam/flutter-android-builder:v3.29.0
+```
 
-1. Builds the Docker image with the Flutter version from the tag or branch
-2. Publishes the image to GitHub Container Registry (GHCR)
+Run the container to build your Android app (make sure you're in your Flutter project directory):
 
-## Contributing
+```bash
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-android-builder:latest
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+This will:
+1. Mount your current directory to `/app` in the container
+2. Run the default command which executes `flutter clean && flutter pub get && flutter build apk --release`
+
+The output APK will be available in your project at:
+```
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+To build an App Bundle instead:
+
+```bash
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-android-builder:latest flutter build appbundle --release
+```
+
+After the build completes, you'll find the APK or AAB in:
+- APK: `build/app/outputs/flutter-apk/app-release.apk`
+- App Bundle: `build/app/outputs/bundle/release/app-release.aab`
+
+### Using an Interactive Shell
+
+If you need to run multiple commands or debug your build:
+
+```bash
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest bash
+```
+
+or for Android:
+
+```bash
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-android-builder:latest bash
+```
+
+Then you can run Flutter commands interactively:
+
+```bash
+flutter pub get
+flutter test
+flutter build web  # or flutter build apk
+```
+
+## Building iOS Applications
+
+Building for iOS requires macOS and cannot be done inside a Docker container due to Apple's platform restrictions. For iOS builds, developers typically use:
+
+- A Mac with Xcode installed
+- macOS-based CI/CD runners (GitHub Actions, CircleCI, etc.)
+- Specialized Flutter CI/CD services
+
+## Cloning and Building Locally
+
+If you want to build these Docker images locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/iarunsaragadam/flutter-docker.git
+cd flutter-docker
+
+# Build the web image
+docker build -t flutter-web-builder:local .
+
+# Build the Android image
+docker build -f Dockerfile.android -t flutter-android-builder:local .
+```
+
+To build with a specific Flutter version:
+
+```bash
+docker build --build-arg FLUTTER_VERSION=3.29.0 -t flutter-web-builder:local .
+```
+
+## Image Details
+
+### Web Builder
+
+Built from `ubuntu:22.04` with:
+- Flutter SDK
+- Web dependencies
+- Web port exposed on 5000
+
+### Android Builder
+
+Built from `ubuntu:22.04` with:
+- Flutter SDK
+- Java 17
+- Android SDK
+- Build tools
+- NDK
+
+## Architecture Support
+
+Both images are built for:
+- `linux/amd64` - For Intel/AMD-based systems (Windows, Intel Macs)
+- `linux/arm64` - For ARM-based systems (Apple Silicon Macs)
+
+## Versioning
+
+Images are tagged with the Flutter version they contain:
+- `latest` - Points to the most recent release
+- `v3.29.0` - Specific Flutter version
 
 ## License
 
 [MIT License](LICENSE)
+
+## Quick Start Example
+
+Here's a complete example to create a new Flutter app and build it using these Docker images:
+
+### Creating a Sample Flutter App and Building for Web
+
+```bash
+# Create a directory for your app
+mkdir my_flutter_app
+cd my_flutter_app
+
+# Create a sample Flutter app using the web builder
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest flutter create .
+
+# Build the web app (will run automatically with the default command)
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest
+
+# Your web build is now available in build/web/
+# You can serve it with Nginx:
+docker run -it --rm -v $(pwd)/build/web:/usr/share/nginx/html -p 8080:80 nginx:alpine
+```
+
+Then open http://localhost:8080 in your browser.
+
+### Building the Same App for Android
+
+```bash
+# From the same app directory
+docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-android-builder:latest
+
+# Your APK is now available at build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Development Workflow
+
+For a typical development workflow:
+
+1. **Create your app:**
+   ```bash
+   docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest flutter create .
+   ```
+
+2. **Work on your code locally** using your favorite editor
+
+3. **Run tests:**
+   ```bash
+   docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest flutter test
+   ```
+
+4. **Build for Web:**
+   ```bash
+   docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-web-builder:latest flutter build web
+   ```
+
+5. **Build for Android:**
+   ```bash
+   docker run -it --rm -v $(pwd):/app ghcr.io/iarunsaragadam/flutter-android-builder:latest
+   ```
