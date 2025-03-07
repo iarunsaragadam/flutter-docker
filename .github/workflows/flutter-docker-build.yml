@@ -1,0 +1,149 @@
+name: Publish Flutter Docker Images
+
+on:
+  push:
+    tags:
+      - "v*.*.*" # Run only when tags matching version format are pushed
+      - "*.*.*" # Run also when tags without the 'v' prefix are pushed
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: "Flutter version to build (e.g., 3.29.0)"
+        required: true
+        default: "3.29.0"
+      platform:
+        description: "Platform to build (web, android, or both)"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - web
+          - android
+          - both
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'both' || github.event.inputs.platform == 'web'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter version from the tag or input
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # Extract version from tag
+            FLUTTER_VERSION=${GITHUB_REF#refs/tags/}
+            # Store the version without the 'v' prefix for Flutter checkout
+            FLUTTER_VERSION_NO_V=${FLUTTER_VERSION#v}
+          else
+            # Use the input parameter (now without 'v' prefix in the input)
+            FLUTTER_VERSION="v${{ github.event.inputs.flutter_version }}"
+            FLUTTER_VERSION_NO_V="${{ github.event.inputs.flutter_version }}"
+          fi
+
+          echo "FLUTTER_VERSION=$FLUTTER_VERSION" >> $GITHUB_ENV
+          echo "FLUTTER_VERSION_NO_V=$FLUTTER_VERSION_NO_V" >> $GITHUB_ENV
+
+      - name: Set up QEMU for multi-platform builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/flutter-web-builder
+          tags: |
+            type=raw,value=${{ env.FLUTTER_VERSION }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FLUTTER_VERSION=${{ env.FLUTTER_VERSION_NO_V }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'both' || github.event.inputs.platform == 'android'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter version from the tag or input
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # Extract version from tag
+            FLUTTER_VERSION=${GITHUB_REF#refs/tags/}
+            # Store the version without the 'v' prefix for Flutter checkout
+            FLUTTER_VERSION_NO_V=${FLUTTER_VERSION#v}
+          else
+            # Use the input parameter (now without 'v' prefix in the input)
+            FLUTTER_VERSION="v${{ github.event.inputs.flutter_version }}"
+            FLUTTER_VERSION_NO_V="${{ github.event.inputs.flutter_version }}"
+          fi
+
+          echo "FLUTTER_VERSION=$FLUTTER_VERSION" >> $GITHUB_ENV
+          echo "FLUTTER_VERSION_NO_V=$FLUTTER_VERSION_NO_V" >> $GITHUB_ENV
+
+      - name: Set up QEMU for multi-platform builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/flutter-android-builder
+          tags: |
+            type=raw,value=${{ env.FLUTTER_VERSION }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.android
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FLUTTER_VERSION=${{ env.FLUTTER_VERSION_NO_V }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

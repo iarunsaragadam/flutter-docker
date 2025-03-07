@@ -38,4 +38,4 @@ WORKDIR /app
 EXPOSE 5000
 
 # Command to run the Flutter web app
-CMD ["flutter", "run", "-d", "web-server", "--web-port=5000"]
+CMD ["bash", "-c", "flutter clean && flutter pub get && flutter build web --release"]
